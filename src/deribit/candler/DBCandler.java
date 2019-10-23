@@ -9,7 +9,8 @@ import org.joda.time.format.*;
 import com.squareup.moshi.*;
 import okhttp3.*;
 import okhttp3.internal.ws.*;
-import deribit.rest.DBRest;
+import deribit.candler.UserTradeListener.KIND;
+import deribit.rest.*;
 import deribit.rest.DBRest.*;
 import utils.*;
 
@@ -24,7 +25,7 @@ public class DBCandler {
 
 	private final OkHttpClient HTTP_CLIENT = new OkHttpClient.Builder().retryOnConnectionFailure(true)
 																		.connectTimeout(10, TimeUnit.SECONDS)
-																		.pingInterval(10, TimeUnit.SECONDS)
+																		//.pingInterval(10, TimeUnit.SECONDS)
 																		.build();
 
 	private final Moshi MOSHI											=	new Moshi.Builder().build();
@@ -33,8 +34,8 @@ public class DBCandler {
 	private final JsonAdapter<OrderSubscription> orderSubscriptionAdapter			=	MOSHI.adapter(OrderSubscription.class);
 	private final JsonAdapter<UserTradeSubscription> userTradeSubscriptionAdapter	=	MOSHI.adapter(UserTradeSubscription.class);
 
-	public final Map<String, Map<Integer, OHLCSeries>> OHLC_SERIES										= new ConcurrentHashMap<>();
-	private static final ConcurrentHashMap<String, ConcurrentSkipListMap<Double, Double>> ORDER_BOOK	= new ConcurrentHashMap<>();
+	public final Map<String, Map<Integer, OHLCSeries>> OHLC_SERIES									= new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<String, ConcurrentSkipListMap<Double, Double>> ORDER_BOOK 	= new ConcurrentHashMap<>();
 	private static boolean obFirstTime = true;
 
 	private final List<CandleListener> candleListeners			=	new CopyOnWriteArrayList<>();
@@ -60,8 +61,14 @@ public class DBCandler {
 	private static final int AUTH_CMD_ID = 4;
 	private static final int SUB_USER_ORDER_TRADES_CMD_ID = 5;
 	private static final int SUB_TRADES_OB_CMD_ID = 6;
+	private static final int GET_USER_TRADES_CMD_ID = 7;
+	private static final int TRANSFER_TO_SUB_ACC_CMD_ID = 8;
 
 	private boolean userAuthorized = false;
+
+	public boolean getUserAuthorized() {
+		return userAuthorized;
+	}
 
 	public void setCredentials(String apiKey, String apiSecret) {
 		if(apiKey == null || apiKey.isEmpty() || apiSecret == null || apiSecret.isEmpty()) return;
@@ -232,6 +239,27 @@ public class DBCandler {
 		return webSocket != null && webSocket.send(body);
 	}
 
+	public boolean getUserTrades(String instrument, int count) {
+		String body =	"{"+
+						"	\"jsonrpc\":	\"2.0\","+
+						"	\"id\":			"+GET_USER_TRADES_CMD_ID+","+
+						"	\"method\":		\"private/get_user_trades_by_instrument\","+
+						"	\"params\":	{"+
+						"		\"instrument_name\":	\""+instrument+"\","+
+						"		\"count\":				"+count+
+						"	}"+
+						"}";
+		body = body.replaceAll("\t", "").replaceAll(" ", "").replaceAll("\r\n", "");
+
+		// System.out.println(body);
+
+		if(webSocket != null && userAuthorized) {
+			return webSocket.send(body);
+		}
+
+		return false;
+	}
+
 	public long getReconnectCnt() {
 		return reconnectCnt;
 	}
@@ -252,8 +280,8 @@ public class DBCandler {
 			while(true) {
 				allPairCandlesReceived = true;
 
-				for(String pair : OHLC_SERIES.keySet()) {
-					for(Integer interval : OHLC_SERIES.get(pair.toUpperCase()).keySet()) {
+				for(String pair : new TreeSet<>(OHLC_SERIES.keySet())) {
+					for(Integer interval : new TreeSet<>(OHLC_SERIES.get(pair.toUpperCase()).keySet())) {
 						OHLC_SERIES.get(pair.toUpperCase()).get(interval).clear();
 
 						if(!fetchOHLCs(pair, interval)) allPairCandlesReceived = false;
@@ -307,6 +335,17 @@ public class DBCandler {
 								"	}"+
 								"}");
 
+					/*
+					socket.send("{"+
+								"	\"jsonrpc\":	\"2.0\","+
+								"	\"method\":		\"public/subscribe\","+
+								"	\"id\":			"+(cmdIdx++)+","+
+								"	\"params\": {"+
+								"		\"channels\": [\"perpetual.BTC-PERPETUAL.raw\",\"ticker.BTC-PERPETUAL.raw\"]"+
+								"	}"+
+								"}");
+					*/
+
 					for(String instrument : OHLC_SERIES.keySet()) {
 						socket.send("{"+
 									"	\"jsonrpc\":	\"2.0\","+
@@ -327,7 +366,7 @@ public class DBCandler {
 									"	\"method\":		\"public/auth\","+
 									"	\"params\": {"+
 									"		\"grant_type\":		\"client_credentials\","+
-									//"		\"scope\":			\"mainaccount\","+
+									//"		\"scope\":			\"mainaccount\","+			//  mainaccount | ip:... ... ... ...
 									"		\"client_id\":		\""+apiKey+"\","+
 									"		\"client_secret\":	\""+apiSecret+"\""+
 									"	}"+
@@ -449,7 +488,7 @@ public class DBCandler {
 
 						(type == POS_TYPE.LIMIT ? "\"post_only\": true," : "")+
 
-						"		\"reduce_only\":		"+reduceOnly+","+	// false
+						"		\"reduce_only\":		"+reduceOnly+","+
 						"		\"label\":				\""+customId+"\""+
 						"	}"+
 						"}";
@@ -462,12 +501,12 @@ public class DBCandler {
 			MOSHI.adapter(Object.class).fromJson(body);
 		}
 		catch(Exception e) {
-			return false;			
+			e.printStackTrace();
+
+			return false;
 		}
 
-		if(webSocket != null && userAuthorized) {
-			return webSocket.send(body);
-		}
+		if(webSocket != null) return webSocket.send(body);
 
 		return false;
 	}
@@ -494,7 +533,50 @@ public class DBCandler {
 		if(webSocket != null && userAuthorized) webSocket.send(body);
 	}
 
+	// dbr.transferToSubaccount(0.00000082, 10)
+	public boolean transferToSubaccount(double amount, long destionationAccountId) {
+		String body =	"{"+
+						"	\"jsonrpc\":	\"2.0\","+
+						"	\"id\":			"+TRANSFER_TO_SUB_ACC_CMD_ID+","+
+						"	\"method\":		\"private/submit_transfer_to_subaccount\","+
+						"	\"params\": {"+
+						"		\"currency\":		\"BTC\","+
+						"		\"amount\":			"+String.format(Locale.US, "%.8f", amount)+","+
+						"		\"destination\":	"+destionationAccountId+
+						"	}"+
+						"}";
+		body = body.replaceAll("\t", "").replaceAll("\r\n", "").replaceAll(" ", "");
+
+		if(webSocket != null && userAuthorized) {
+			return webSocket.send(body);
+		}
+
+		/*
+			{
+				"jsonrpc":	"2.0",
+				"result":	{
+					"updated_timestamp":	1571690,
+					"type":					"subaccount",
+					"state":				"confirmed",
+					"other_side":			"pr...",
+					"id":					80,
+					"direction":			"payment",
+					"currency":				"BTC",
+					"created_timestamp":	157169012,
+					"amount":				2
+				},
+				"usIn":		1571690,
+				"usOut":	1571690,
+				"usDiff":	29,
+				"testnet":	false
+			}
+		 */
+
+		return false;
+	}
+
 	private void parseMessage(final String message, final WebSocket socket) {
+		/*
 		if(
 			!message.contains("heartbeat") &&
 			!message.contains("version") &&
@@ -504,6 +586,7 @@ public class DBCandler {
 		{
 			Log.i("ON_MSG: "+message);
 		}
+		*/
 
 		UserTradeSubscription uts;
 		TradeSubscription ts;
@@ -566,10 +649,38 @@ public class DBCandler {
 			return;
 		}
 
+		if(message.contains("\"id\":"+TRANSFER_TO_SUB_ACC_CMD_ID)) {
+			// System.out.println("\r\n"+message+"\r\n");
+
+			return;
+		}
+
+		if(message.contains("\"id\":"+GET_USER_TRADES_CMD_ID)) {
+			try {
+				final UserTradesResponse utr = MOSHI.adapter(UserTradesResponse.class).fromJson(message);
+				if(utr == null) return;
+
+				for(UserTrade ut : utr.result.trades) {
+					for(UserTradeListener utl : userTradeListeners) {
+						utl.onNewTrade(KIND.GET_EVENT, ut, ut.instrument_name, ut.toString());
+					}
+				}
+			}
+			catch(Exception e) {
+				e.printStackTrace();
+			}
+
+			return;
+		}
+
 		if(message.contains("\"id\":"+PLACE_ORDER_CMD_ID)) {
 			try {
 				final SetOrderResponse sor = MOSHI.adapter(SetOrderResponse.class).fromJson(message);
 				if(sor == null) return;
+
+				if(sor.error != null) {
+					System.out.println("\r\n"+message+"\r\n");
+				}
 			}
 			catch(Exception e) {
 				e.printStackTrace();
@@ -598,6 +709,8 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MESAGE:\r\n"+message);
 			}
 
 			return;
@@ -639,6 +752,8 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MESSAGE:\r\n"+message);
 			}
 
 			return;
@@ -653,8 +768,8 @@ public class DBCandler {
 				"data": [
 					{
 						"trade_seq":		25203917,
-						"trade_id":			"4516",
-						"timestamp":		1571,
+						"trade_id":			"451",
+						"timestamp":		15713,
 						"tick_direction":	0,
 						"price":			8087.0,
 						"instrument_name":	"BTC-PERPETUAL",
@@ -766,15 +881,15 @@ public class DBCandler {
 					"post_only":		true,
 					"order_type":				"limit",
 					"order_state":				"open",
-					"order_id":					"2971",
+					"order_id":					"29710",
 					"max_show":					10,
-					"last_update_timestamp":	15712,
+					"last_update_timestamp":	1571,
 					"label":					"",
 					"is_liquidation":			false,
 					"instrument_name":			"BTC-PERPETUAL",
 					"filled_amount":			0,
 					"direction":				"buy",
-					"creation_timestamp":		157123,
+					"creation_timestamp":		15712,
 					"commission":				0.0,
 					"average_price":			0.0,
 					"api":						false,
@@ -791,10 +906,10 @@ public class DBCandler {
 			try {
 				os = orderSubscriptionAdapter.fromJson(message);
 
-				if(os == null) return;
+				if(os == null || os.params == null || os.params.data == null) return;
 
 				for(UserOrderListener uol : userOrderListeners) {
-					uol.onNewOrder(os.params.data, os.params.data.instrument_name, message);
+					uol.onNewUserOrder(os.params.data, os.params.data.instrument_name, message);
 				}
 			}
 			catch(Exception e) {
@@ -848,7 +963,7 @@ public class DBCandler {
 
 				for(UserTrade ut : uts.params.data) {
 					for(UserTradeListener utl : userTradeListeners) {
-						utl.onNewTrade(ut, ut.instrument_name, message);
+						utl.onNewTrade(KIND.TRADE_EVENT, ut, ut.instrument_name, message);
 					}
 				}
 			}
@@ -925,6 +1040,15 @@ class BaseResponse {
 	public boolean testnet;
 }
 
+class UserTradesResponse extends BaseResponse {
+	public UserTradesResponseResult result;
+}
+
+class UserTradesResponseResult {
+	public List<UserTrade> trades;
+	public boolean has_more;
+}
+
 class OrderBookResponse {
 	public OrderBookResponseParams params;
 }
@@ -948,18 +1072,13 @@ class SetOrderResponse extends BaseResponse {
 	"result":{
 		"token_type":		"bearer",
 		"scope":			"account:read block_trade:read connection mainaccount trade:read_write wallet:read",
-		"refresh_token":	"160292..................",
+		"refresh_token":	"16029",
 		"expires_in":		31536000,
-		"access_token":		"1602928534475.1BY1c0Vz.............................lJE"
+		"access_token":		"1602928534475.1BY1c0Vz."
 	}
 */
 class UserAuthResponse extends BaseResponse {
 	public UserAuthResult result;
-}
-
-class UserAuthResult {
-	public String token_type, scope, refresh_token, access_token;
-	public long expires_in;
 }
 
 class OrderSubscription {

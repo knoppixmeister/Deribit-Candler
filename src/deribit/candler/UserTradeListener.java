@@ -1,5 +1,10 @@
 package deribit.candler;
 
 public interface UserTradeListener {
-	void onNewTrade(final UserTrade trade, final String instrument, final String rawData);
+	public enum KIND {
+		TRADE_EVENT,
+		GET_EVENT
+	}
+
+	void onNewTrade(final KIND kind, final UserTrade trade, final String instrument, final String rawData);
 }
