@@ -2,7 +2,7 @@ package deribit.rest;
 
 import java.util.List;
 import com.squareup.moshi.*;
-import candler.*;
+import deribit.candler.*;
 
 public class OrderResult {
 	public List<UserTrade> trades;

@@ -9,8 +9,8 @@ import org.joda.time.format.*;
 import com.squareup.moshi.*;
 import okhttp3.*;
 import okhttp3.internal.ws.*;
-import rest.DBRest;
-import rest.DBRest.*;
+import deribit.rest.DBRest;
+import deribit.rest.DBRest.*;
 import utils.*;
 
 public class DBCandler {
