@@ -12,7 +12,7 @@ import okhttp3.internal.ws.*;
 import deribit.candler.UserTradeListener.KIND;
 import deribit.rest.*;
 import deribit.rest.DBRest.*;
-import utils.*;
+import deribit.utils.*;
 
 public class DBCandler {
 	private static final String REAL_WS_BASE_URL	=	"wss://deribit.com/ws/api/v2";
