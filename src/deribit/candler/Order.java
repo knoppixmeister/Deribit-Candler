@@ -40,10 +40,17 @@ public class Order {
 
 					order_id,
 					instrument_name,
-					direction;
-	public double price, commission;
+					direction,
+
+					/*
+						last_price
+						index_price
+						mark_price
+					 */
+					trigger;
+	public double price, commission, stop_price;
 	public boolean post_only, reduce_only, api, is_liquidation;
-	public long amount, creation_timestamp, filled_amount, last_update_timestamp;
+	public long amount, creation_timestamp, filled_amount, last_update_timestamp, max_show;
 
 	public String toString() {
 		return new Moshi.Builder().build().adapter(Order.class).toJson(this);
