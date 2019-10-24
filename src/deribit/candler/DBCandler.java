@@ -828,7 +828,7 @@ public class DBCandler {
 								t.price,
 								t.price,
 								t.price,
-								Utils.round(t.amount/t.price, 8)
+								Utils.round(t.amount/t.price, 8) // translate USD volume to BTC volume
 							);
 
 							if(OHLC_SERIES.get(t.instrument_name).get(intervalKey).getItemCount() > OHLC_ITEMS_COUNT) {
@@ -842,7 +842,7 @@ public class DBCandler {
 										.get(intervalKey)
 										.updatePriceVolume(
 											t.price,
-											lastCandle.getVolume()+Utils.round(t.amount/t.price, 8)
+											lastCandle.getVolume()+Utils.round(t.amount/t.price, 8) // translate USD volume to BTC volume
 										);
 
 							isCandleUpdate = true;
