@@ -66,6 +66,20 @@ public class DBCandler {
 
 	private boolean userAuthorized = false;
 
+	public DBCandler() {
+	}
+
+	public DBCandler(String apiKey, String apiSecret) {
+		this.apiKey = apiKey;
+		this.apiSecret = apiSecret;
+	}
+
+	public DBCandler(String apiKey, String apiSecret, boolean useTestnet) {
+		this.apiKey = apiKey;
+		this.apiSecret = apiSecret;
+		this.useTestnet = useTestnet;
+	}
+
 	public boolean getUserAuthorized() {
 		return userAuthorized;
 	}
@@ -103,14 +117,6 @@ public class DBCandler {
 								"}");
 			}
 		}
-	}
-
-	public DBCandler() {
-	}
-
-	public DBCandler(String apiKey, String apiSecret) {
-		this.apiKey = apiKey;
-		this.apiSecret = apiSecret;
 	}
 
 	public boolean add(String instrument, int interval) {
@@ -822,7 +828,7 @@ public class DBCandler {
 								t.price,
 								t.price,
 								t.price,
-								t.amount
+								Utils.round(t.amount/t.price, 8)
 							);
 
 							if(OHLC_SERIES.get(t.instrument_name).get(intervalKey).getItemCount() > OHLC_ITEMS_COUNT) {
@@ -836,7 +842,7 @@ public class DBCandler {
 										.get(intervalKey)
 										.updatePriceVolume(
 											t.price,
-											lastCandle.getVolume()+t.amount
+											lastCandle.getVolume()+Utils.round(t.amount/t.price, 8)
 										);
 
 							isCandleUpdate = true;
