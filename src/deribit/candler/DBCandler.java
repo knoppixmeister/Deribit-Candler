@@ -959,7 +959,6 @@ public class DBCandler {
 		{
 			try {
 				uts = userTradeSubscriptionAdapter.fromJson(message);
-
 				if(uts == null) return;
 
 				for(UserTrade ut : uts.params.data) {
