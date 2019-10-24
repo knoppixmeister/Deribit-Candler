@@ -721,18 +721,13 @@ public class DBCandler {
 				final CandlesResponse cr = MOSHI.adapter(CandlesResponse.class).fromJson(message);
 				if(cr == null || cr.error != null || cr.result == null || !cr.result.status.equalsIgnoreCase("ok")) return;
 
-				DateTime dt;
-				String dts;
-
 				OHLCSeries _OHLC_SERIES = new OHLCSeries("");
 
 				_OHLC_SERIES.setNotify(false);
 
+				DateTime dt;
 				for(int key=0; key<cr.result.ticks.size(); key++) {
 					dt = new DateTime(cr.result.ticks.get(key));
-
-					dts = dt.toString().replaceAll("T", " ");
-					dts = dts.substring(0, dts.lastIndexOf("."));
 
 					_OHLC_SERIES.add(
 						new FixedMillisecond(cr.result.ticks.get(key)),
