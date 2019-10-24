@@ -907,7 +907,6 @@ public class DBCandler {
 		{
 			try {
 				os = orderSubscriptionAdapter.fromJson(message);
-
 				if(os == null || os.params == null || os.params.data == null) return;
 
 				for(UserOrderListener uol : userOrderListeners) {
@@ -930,7 +929,7 @@ public class DBCandler {
 					"data":[
 						{
 							"trade_seq":		13078153,
-							"trade_id":"		23881492",
+							"trade_id":			"23881492",
 							"timestamp":		1571,
 							"tick_direction":	0,
 							"state":			"filled",
