@@ -848,6 +848,7 @@ public class DBCandler {
 							isCandleUpdate = true;
 						}
 
+						// notify listeners of candles (OHLCs)
 						for(CandleListener cl : candleListeners) {
 							cl.onNewCandleData(
 								OHLC_SERIES.get(t.instrument_name).get(intervalKey),
