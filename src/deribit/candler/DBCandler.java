@@ -899,7 +899,7 @@ public class DBCandler {
 		}
 		*/
 		if(
-			message.contains("\"subscription\"") && 
+			message.contains("\"subscription\"") &&
 			message.contains("\"user.orders.")
 		)
 		{
