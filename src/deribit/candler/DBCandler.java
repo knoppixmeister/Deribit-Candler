@@ -121,8 +121,7 @@ public class DBCandler {
 
 	public boolean add(String instrument, int interval) {
 		if(!OHLC_SERIES.containsKey(instrument.toUpperCase())) {
-			ConcurrentHashMap<Integer, OHLCSeries> ohlcs = new ConcurrentHashMap<>();
-			OHLC_SERIES.put(instrument.toUpperCase(), ohlcs);
+			OHLC_SERIES.put(instrument.toUpperCase(), new ConcurrentHashMap<Integer, OHLCSeries>());
 		}
 		if(!OHLC_SERIES.get(instrument.toUpperCase()).containsKey(interval)) {
 			OHLC_SERIES.get(instrument.toUpperCase()).put(interval, new OHLCSeries(""));
@@ -130,7 +129,7 @@ public class DBCandler {
 
 		if(!fetchOHLCs(instrument, interval)) {
 			System.out.println("COULD NOT RECEIVE INITIAL CANDLES. EXIT !!!");
-			System.exit(0);
+			System.exit(1);
 		}
 
 		if(webSocket != null) {
@@ -142,6 +141,7 @@ public class DBCandler {
 		return true;
 	}
 
+	@SuppressWarnings("unused")
 	private boolean fetchOHLCs(final String instrument, final int interval) {
 		System.out.print("DB_CANDLER. START FETCHING INITIAL CANDLES "+instrument+"/"+interval+" .... ");
 
@@ -169,16 +169,11 @@ public class DBCandler {
 					final CandlesResponse cr = MOSHI.adapter(CandlesResponse.class).fromJson(json);
 					if(cr == null || cr.result == null || !cr.result.status.equalsIgnoreCase("ok")) return false;
 
-					DateTime dt;
-					String dts;
-
 					OHLC_SERIES.get(instrument.toUpperCase()).get(interval).setNotify(false);
 
+					DateTime dt;
 					for(int key=0; key<cr.result.ticks.size(); key++) {
 						dt = new DateTime(cr.result.ticks.get(key));
-
-						dts = dt.toString().replaceAll("T", " ");
-						dts = dts.substring(0, dts.lastIndexOf("."));
 
 						OHLC_SERIES.get(instrument.toUpperCase()).get(interval).add(
 							new FixedMillisecond(cr.result.ticks.get(key)),
@@ -581,6 +576,7 @@ public class DBCandler {
 		return false;
 	}
 
+	@SuppressWarnings("unused")
 	private void parseMessage(final String message, final WebSocket socket) {
 		/*
 		if(
@@ -650,18 +646,21 @@ public class DBCandler {
 				}
 			}
 			catch(Exception e) {
+				e.printStackTrace();
+
+				System.err.println("ERR_MSG_1:\r\n"+message);
 			}
 
 			return;
 		}
 
-		if(message.contains("\"id\":"+TRANSFER_TO_SUB_ACC_CMD_ID)) {
+		if(message.contains("\"id\":"+TRANSFER_TO_SUB_ACC_CMD_ID+",")) {
 			// System.out.println("\r\n"+message+"\r\n");
 
 			return;
 		}
 
-		if(message.contains("\"id\":"+GET_USER_TRADES_CMD_ID)) {
+		if(message.contains("\"id\":"+GET_USER_TRADES_CMD_ID+",")) {
 			try {
 				final UserTradesResponse utr = MOSHI.adapter(UserTradesResponse.class).fromJson(message);
 				if(utr == null) return;
@@ -674,12 +673,14 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MSG_2:\r\n"+message);
 			}
 
 			return;
 		}
 
-		if(message.contains("\"id\":"+PLACE_ORDER_CMD_ID)) {
+		if(message.contains("\"id\":"+PLACE_ORDER_CMD_ID+",")) {
 			try {
 				final SetOrderResponse sor = MOSHI.adapter(SetOrderResponse.class).fromJson(message);
 				if(sor == null) return;
@@ -690,12 +691,14 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MSG_3:\r\n"+message);
 			}
 
 			return;
 		}
 
-		if(message.contains("\"id\":"+AUTH_CMD_ID)) {
+		if(message.contains("\"id\":"+AUTH_CMD_ID+",")) {
 			try {
 				final UserAuthResponse uar = MOSHI.adapter(UserAuthResponse.class).fromJson(message);
 				if(uar == null || uar.error != null || uar.result == null) {
@@ -716,13 +719,13 @@ public class DBCandler {
 			catch(Exception e) {
 				e.printStackTrace();
 
-				System.err.println("ERR_MESAGE:\r\n"+message);
+				System.err.println("ERR_MSG_4:\r\n"+message);
 			}
 
 			return;
 		}
 
-		if(message.contains("\"id\":"+GET_OHLCS_CMD_ID)) {
+		if(message.contains("\"id\":"+GET_OHLCS_CMD_ID+",")) {
 			try {
 				final CandlesResponse cr = MOSHI.adapter(CandlesResponse.class).fromJson(message);
 				if(cr == null || cr.error != null || cr.result == null || !cr.result.status.equalsIgnoreCase("ok")) return;
@@ -754,7 +757,7 @@ public class DBCandler {
 			catch(Exception e) {
 				e.printStackTrace();
 
-				System.err.println("ERR_MESSAGE:\r\n"+message);
+				System.err.println("ERR_MSG_5:\r\n"+message);
 			}
 
 			return;
@@ -863,6 +866,8 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MSG_6:\r\n"+message);
 			}
 
 			return;
@@ -915,6 +920,8 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MSG_7:\r\n"+message);
 			}
 
 			return;
@@ -969,6 +976,8 @@ public class DBCandler {
 			}
 			catch(Exception e) {
 				e.printStackTrace();
+
+				System.err.println("ERR_MSG_8:\r\n"+message);
 			}
 
 			return;
